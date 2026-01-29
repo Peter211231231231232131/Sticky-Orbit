@@ -1,0 +1,12 @@
+{
+  "name": "sticky-orbit",
+  "version": "1.0.0",
+  "description": "Sticky Orbit - physics arcade game",
+  "private": true,
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
