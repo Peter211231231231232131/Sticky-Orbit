@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sticky Orbit | Physics Arcade</title>
+    <meta name="description" content="A minimalist physics arcade game where you jump between planetary orbits.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="game-container">
+        <div id="ui-layer">
+            <div class="header">
+                <div class="score-container">
+                    <span class="label">DISTANCE</span>
+                    <span id="score">0m</span>
+                </div>
+                <div class="best-container">
+                    <span class="label">BEST</span>
+                    <span id="best">0m</span>
+                </div>
+            </div>
+
+            <div id="start-screen" class="overlay active">
+                <h1>STICKY ORBIT</h1>
+                <p>Tap to leap from orbit to orbit.</p>
+                <div class="instructions">
+                    <div class="inst-item">
+                        <div class="tutorial-visual">
+                            <div class="planet-mini"></div>
+                            <div class="moon-mini"></div>
+                        </div>
+                        <span>Catch the gravity fields.</span>
+                    </div>
+                </div>
+                <p class="hint">Don't fly off into the void.</p>
+                <div class="mode-buttons">
+                    <button id="start-button" data-mode="classic">CLASSIC</button>
+                    <button id="survival-button" data-mode="survival">🔥 SURVIVAL</button>
+                </div>
+            </div>
+
+            <div id="game-over-screen" class="overlay">
+                <h2>LOST IN SPACE</h2>
+                <div class="final-stats">
+                    <div class="stat">
+                        <span class="label">SCORE</span>
+                        <span id="final-score">0m</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">LEAPS</span>
+                        <span id="final-leaps">0</span>
+                    </div>
+                </div>
+                <button id="restart-button">TRY AGAIN</button>
+            </div>
+        </div>
+        <canvas id="game-canvas"></canvas>
+    </div>
+    <script src="game.js?v=2"></script>
+</body>
+
+</html>
