@@ -64,7 +64,7 @@ class ChasingSun {
         // Rise toward player (moving up = decreasing Y)
         this.y -= this.speed;
         // Accelerate over time
-        this.speed = Math.min(3.0, this.speed + 0.0003);
+        this.speed = Math.min(3.0, this.speed + 0.0009);
         this.coronaAngle += 0.03;
 
         // Pull the closest planet toward sun
@@ -1162,3 +1162,4 @@ function createParticles(x, y, color, count) {
 }
 
 init();
+
