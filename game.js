@@ -1,20 +1,11 @@
 /**
- * STICKY ORBIT - COMPLETE STABLE EDITION
- * - Fixed: Boss Cluster Parenting Logic
- * - Added: Moon Trail & Catch Particles
- * - Fixed: Delta-time movement for 60Hz/144Hz parity
- * - Fixed: Planet cleanup to prevent Boss despawning mid-fight
+ * STICKY ORBIT - OFFICIAL STABLE SOURCE
+ * Features: Parent-Child Boss Logic, Smoothed Textures, Particle Systems, 
+ * High Score persistence, and DOM-safe initialization.
  */
 
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-
-// Game Constants
-const GRAVITY = 0.18;
-const JUMP_FORCE = 8;
-const PARTICLE_COUNT = 15;
-
-// Game State
+// Global Game Variables
+let canvas, ctx;
 let score = 0;
 let bestScore = localStorage.getItem('stickyOrbitBest') || 0;
 let gameActive = false;
@@ -25,52 +16,63 @@ let particles = [];
 let lastPlanetY = 0;
 let planetCount = 0;
 
+// Constants
+const GRAVITY = 0.18;
+const JUMP_FORCE = 8;
+const INITIAL_ORBIT_SPEED = 0.05;
+
+/**
+ * Particle Class for explosions and jumps
+ */
 class Particle {
     constructor(x, y, color) {
         this.x = x;
         this.y = y;
-        this.vx = (Math.random() - 0.5) * 8;
-        this.vy = (Math.random() - 0.5) * 8;
-        this.life = 1.0;
+        this.vx = (Math.random() - 0.5) * 10;
+        this.vy = (Math.random() - 0.5) * 10;
+        this.alpha = 1;
         this.color = color;
     }
     update() {
         this.x += this.vx;
         this.y += this.vy;
-        this.life -= 0.03;
+        this.alpha -= 0.02;
     }
     draw() {
-        ctx.globalAlpha = this.life;
+        ctx.globalAlpha = this.alpha;
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.x, this.y - cameraY, 3, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1.0;
+        ctx.globalAlpha = 1;
     }
 }
 
+/**
+ * Moon Class (The Player)
+ */
 class Moon {
     constructor() {
         this.reset();
         this.trail = [];
     }
     reset() {
-        this.x = canvas.width / 2;
+        this.x = canvas ? canvas.width / 2 : 0;
         this.y = 500;
         this.vx = 0;
         this.vy = 0;
         this.radius = 12;
-        this.state = 'orbiting';
+        this.state = 'orbiting'; 
         this.currentPlanet = null;
         this.angle = 0;
-        this.orbitSpeed = 0.05;
+        this.orbitSpeed = INITIAL_ORBIT_SPEED;
         this.orbitRadius = 80;
         this.trail = [];
     }
     update() {
-        // Handle Trail
-        this.trail.push({x: this.x, y: this.y});
-        if (this.trail.length > 10) this.trail.shift();
+        // Record trail for visual effect
+        this.trail.push({ x: this.x, y: this.y });
+        if (this.trail.length > 12) this.trail.shift();
 
         if (this.state === 'orbiting' && this.currentPlanet) {
             this.angle += this.orbitSpeed;
@@ -83,16 +85,16 @@ class Moon {
         }
     }
     draw() {
-        // Draw Trail
+        // Draw Motion Trail
         this.trail.forEach((t, i) => {
-            ctx.globalAlpha = i / 20;
+            ctx.globalAlpha = i / 24;
             ctx.fillStyle = '#fff';
             ctx.beginPath();
-            ctx.arc(t.x, t.y - cameraY, this.radius * (i / 10), 0, Math.PI * 2);
+            ctx.arc(t.x, t.y - cameraY, this.radius * (i / 12), 0, Math.PI * 2);
             ctx.fill();
         });
-        ctx.globalAlpha = 1.0;
-
+        
+        ctx.globalAlpha = 1;
         ctx.save();
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#fff';
@@ -104,6 +106,9 @@ class Moon {
     }
 }
 
+/**
+ * Planet Class (Includes Normal and Boss/Sun logic)
+ */
 class Planet {
     constructor(x, y, radius, type = 'normal') {
         this.x = x;
@@ -111,23 +116,23 @@ class Planet {
         this.radius = radius;
         this.type = type;
         this.rotation = Math.random() * Math.PI * 2;
-        this.rotationSpeed = 0.01 + Math.random() * 0.02;
+        this.rotationSpeed = 0.01 + Math.random() * 0.01;
         this.pulse = 0;
-        this.textureData = [];
         this.visited = false;
+        this.textureData = [];
         
-        // Boss Logic
-        this.bossParent = null;
+        // --- BOSS ORBITAL LOGIC ---
+        this.bossParent = null; // Points to the Sun
         this.orbitAngleOffset = 0;
         this.orbitDist = 0;
-        this.clusterAngle = 0;
+        this.clusterAngle = 0; // Shared rotation for the ring
 
-        const spotCount = type === 'sun' ? 12 : 5;
+        const spotCount = type === 'sun' ? 15 : 6;
         for (let i = 0; i < spotCount; i++) {
             this.textureData.push({
                 x: Math.random() * 2 - 1,
                 y: Math.random() * 2 - 1,
-                r: 0.1 + Math.random() * 0.2
+                r: Math.random() * 0.2 + 0.1
             });
         }
     }
@@ -136,6 +141,7 @@ class Planet {
         this.rotation += this.rotationSpeed;
         if (this.pulse > 0) this.pulse -= 0.05;
 
+        // Parent-Child update: This makes the cluster rotate around the Boss
         if (this.bossParent) {
             this.bossParent.clusterAngle += 0.002; 
             const finalAngle = this.bossParent.clusterAngle + this.orbitAngleOffset;
@@ -145,50 +151,58 @@ class Planet {
     }
 
     draw() {
-        ctx.save();
-        const drawY = this.y - cameraY;
+        const dY = this.y - cameraY;
+        if (dY < -200 || dY > canvas.height + 200) return;
 
-        ctx.shadowBlur = this.type === 'sun' ? 40 : 15;
+        ctx.save();
+        ctx.shadowBlur = this.type === 'sun' ? 40 : 20;
         ctx.shadowColor = this.type === 'sun' ? '#f59e0b' : '#3b82f6';
 
-        let gradient = ctx.createRadialGradient(this.x, drawY, 0, this.x, drawY, this.radius + this.pulse * 10);
+        let g = ctx.createRadialGradient(this.x, dY, 0, this.x, dY, this.radius + (this.pulse * 10));
         if (this.type === 'sun') {
-            gradient.addColorStop(0, '#fef3c7');
-            gradient.addColorStop(1, '#d97706');
+            g.addColorStop(0, '#fcd34d');
+            g.addColorStop(1, '#b45309');
         } else {
-            gradient.addColorStop(0, '#60a5fa');
-            gradient.addColorStop(1, '#1d4ed8');
+            g.addColorStop(0, '#60a5fa');
+            g.addColorStop(1, '#1d4ed8');
         }
-        
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(this.x, drawY, this.radius + this.pulse * 5, 0, Math.PI * 2);
-        ctx.fill();
 
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(this.x, dY, this.radius + (this.pulse * 5), 0, Math.PI * 2);
+        ctx.fill();
         ctx.shadowBlur = 0;
-        ctx.fillStyle = this.type === 'sun' ? 'rgba(180, 83, 9, 0.4)' : 'rgba(255,255,255,0.1)';
-        this.textureData.forEach(d => {
-            const rotX = d.x * Math.cos(this.rotation) - d.y * Math.sin(this.rotation);
-            const rotY = d.x * Math.sin(this.rotation) + d.y * Math.cos(this.rotation);
+
+        // Texture Spots
+        ctx.fillStyle = this.type === 'sun' ? 'rgba(251, 191, 36, 0.4)' : 'rgba(255,255,255,0.15)';
+        this.textureData.forEach(t => {
+            const rotX = t.x * Math.cos(this.rotation) - t.y * Math.sin(this.rotation);
+            const rotY = t.x * Math.sin(this.rotation) + t.y * Math.cos(this.rotation);
             ctx.beginPath();
-            ctx.arc(this.x + rotX * this.radius * 0.7, drawY + rotY * this.radius * 0.7, d.r * this.radius, 0, Math.PI * 2);
+            ctx.arc(this.x + (rotX * this.radius * 0.7), dY + (rotY * this.radius * 0.7), t.r * this.radius, 0, Math.PI * 2);
             ctx.fill();
         });
-
         ctx.restore();
     }
 }
 
 const moon = new Moon();
 
+/**
+ * Logic to generate planets and periodic bosses
+ */
 function spawnPlanets() {
     while (planets.length < 15) {
         const isBoss = (planetCount > 0 && planetCount % 20 === 0);
-        const y = lastPlanetY - (isBoss ? 550 : 250 + Math.random() * 100);
+        const y = lastPlanetY - (isBoss ? 600 : 250 + Math.random() * 100);
         
         if (isBoss) {
+            // Spawn Main Sun Boss
             const sun = new Planet(canvas.width / 2, y, 95, 'sun');
+            sun.clusterAngle = 0;
             planets.push(sun);
+
+            // Spawn its 8 orbital planets
             for (let i = 0; i < 8; i++) {
                 const child = new Planet(sun.x, sun.y, 25, 'normal');
                 child.bossParent = sun;
@@ -208,7 +222,7 @@ function spawnPlanets() {
 }
 
 function createParticles(x, y, color) {
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
+    for (let i = 0; i < 12; i++) {
         particles.push(new Particle(x, y, color));
     }
 }
@@ -217,6 +231,9 @@ function handleInput() {
     if (!gameActive) {
         resetGame();
         gameActive = true;
+        // Hide overlay if it exists in your HTML
+        const overlay = document.getElementById('overlay');
+        if (overlay) overlay.style.display = 'none';
         return;
     }
 
@@ -242,9 +259,11 @@ function resetGame() {
     planetCount = 0;
     lastPlanetY = 500;
     
+    // Starting planet
     const p = new Planet(canvas.width / 2, 500, 50);
     p.visited = true;
     planets.push(p);
+    
     moon.reset();
     moon.currentPlanet = p;
     spawnPlanets();
@@ -254,16 +273,21 @@ function update() {
     if (!gameActive) return;
 
     moon.update();
-    const targetCam = moon.y - canvas.height * 0.6;
-    cameraY += (targetCam - cameraY) * 0.08;
 
+    // Smoothed Camera Follow
+    const targetCam = moon.y - canvas.height * 0.6;
+    cameraY += (targetCam - cameraY) * 0.1;
+
+    // Particles
     particles.forEach((p, i) => {
         p.update();
-        if (p.life <= 0) particles.splice(i, 1);
+        if (p.alpha <= 0) particles.splice(i, 1);
     });
 
+    // Planets
     planets.forEach(p => p.update());
 
+    // Landing on a planet
     if (moon.state === 'freefall') {
         planets.forEach(p => {
             const dx = moon.x - p.x;
@@ -291,6 +315,7 @@ function update() {
         });
     }
 
+    // Asteroids logic
     if (Math.random() < 0.02) {
         fallingAsteroids.push({
             x: Math.random() * canvas.width,
@@ -306,46 +331,58 @@ function update() {
         const dy = moon.y - fa.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
+        // Fairer hitbox (75% of visual size)
         if (dist < (moon.radius + fa.radius * 0.75)) {
-            gameActive = false;
+            gameOver();
         }
         if (fa.y > cameraY + canvas.height + 100) fallingAsteroids.splice(index, 1);
     });
 
-    // Cleanup: Only remove planets far below the camera, 
-    // and never remove a planet the moon is currently orbiting.
-    planets = planets.filter(p => p.y < cameraY + canvas.height + 400 || p === moon.currentPlanet);
-    
+    // Cleanup off-screen planets
+    if (planets.length > 30) {
+        planets = planets.filter(p => p.y < cameraY + canvas.height + 400 || p === moon.currentPlanet);
+    }
     spawnPlanets();
 
+    // Fall death
     if (moon.y > cameraY + canvas.height + 200) {
-        gameActive = false;
+        gameOver();
+    }
+}
+
+function gameOver() {
+    gameActive = false;
+    const overlay = document.getElementById('overlay');
+    if (overlay) {
+        overlay.style.display = 'flex';
+        document.getElementById('msg').innerText = "CRASHED! TAP TO RESTART";
     }
 }
 
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     // Background
     ctx.fillStyle = '#020617';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Stars (Simple static starfield)
+    ctx.fillStyle = '#fff';
+    for(let i=0; i<5; i++) {
+        ctx.fillRect((i*213)%canvas.width, (i*712-cameraY*0.2)%canvas.height, 2, 2);
+    }
 
     planets.forEach(p => p.draw());
     particles.forEach(p => p.draw());
     
     fallingAsteroids.forEach(fa => {
         ctx.fillStyle = '#ef4444';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#ef4444';
         ctx.beginPath();
         ctx.arc(fa.x, fa.y - cameraY, fa.radius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
     });
 
     moon.draw();
 
-    // UI
+    // UI Score
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'left';
@@ -353,33 +390,33 @@ function draw() {
     ctx.textAlign = 'right';
     ctx.fillText(`Best: ${bestScore}`, canvas.width - 30, 50);
 
-    if (!gameActive) {
-        ctx.fillStyle = 'rgba(2, 6, 23, 0.85)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#fff';
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 48px Arial';
-        ctx.fillText('STICKY ORBIT', canvas.width / 2, canvas.height / 2 - 40);
-        ctx.font = '20px Arial';
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillText('TAP TO EXPLORE', canvas.width / 2, canvas.height / 2 + 20);
-    }
-
-    update(); // Run physics update before next frame
+    update();
     requestAnimationFrame(draw);
 }
 
-// Input
-window.addEventListener('mousedown', (e) => { e.preventDefault(); handleInput(); });
-window.addEventListener('touchstart', (e) => { e.preventDefault(); handleInput(); });
+/**
+ * Safe Initialization
+ */
+function init() {
+    canvas = document.getElementById('gameCanvas');
+    if (!canvas) return;
+    ctx = canvas.getContext('2d');
 
-// Fullscreen Resize
+    window.addEventListener('resize', resize);
+    resize();
+
+    window.addEventListener('mousedown', (e) => { e.preventDefault(); handleInput(); });
+    window.addEventListener('touchstart', (e) => { e.preventDefault(); handleInput(); });
+
+    resetGame();
+    draw();
+}
+
 function resize() {
+    if (!canvas) return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
-window.addEventListener('resize', resize);
-resize();
 
-// Startup
-draw();
+// Start when DOM is ready
+window.addEventListener('DOMContentLoaded', init);
